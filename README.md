@@ -5,9 +5,9 @@ road drivers. The service is built as a modular FastAPI monolith with
 production-like boundaries: auth, users, vehicles, trips, billing,
 notifications, recommendations, and ML adapters.
 
-Current state: MVP-ready demo backend. It uses in-memory storage so the Android
-team can integrate immediately, while the project already has Postgres,
-Docker, and ML adapter boundaries prepared for the next implementation step.
+Current state: MVP-ready demo backend. It uses PostgreSQL storage with demo seed
+data so the Android team can integrate immediately, while the project already
+has Docker and ML adapter boundaries prepared for the next implementation step.
 
 ## Stack
 
@@ -65,8 +65,8 @@ app/
 ```
 
 The repository is currently a working MVP. API endpoints use service layers and
-demo in-memory storage so Android can start integration before database and ML
-wiring are finished.
+PostgreSQL-backed demo data so Android can start integration before ML wiring is
+finished.
 
 ## Run Locally
 
