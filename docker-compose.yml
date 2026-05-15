@@ -1,0 +1,25 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://driver:driver@postgres:5432/driver_assistant
+      JWT_SECRET_KEY: dev-secret
+      BACKEND_CORS_ORIGINS: "*"
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: driver
+      POSTGRES_PASSWORD: driver
+      POSTGRES_DB: driver_assistant
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
