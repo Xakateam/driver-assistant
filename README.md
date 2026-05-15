@@ -80,6 +80,19 @@ Open:
 - Health: http://127.0.0.1:8000/health
 - API version: http://127.0.0.1:8000/api/v1/version
 
+## Sentry
+
+Sentry is disabled by default. Set `SENTRY_DSN` to enable FastAPI and Starlette
+error/performance monitoring:
+
+```bash
+SENTRY_DSN=https://public-key@o0.ingest.sentry.io/project-id
+SENTRY_ENVIRONMENT=production
+SENTRY_TRACES_SAMPLE_RATE=0.1
+```
+
+Leave `SENTRY_DSN` empty for local runs and tests without Sentry reporting.
+
 ## Run With Docker
 
 ```bash
@@ -87,7 +100,8 @@ docker compose up --build
 ```
 
 This starts the API and PostgreSQL. The current MVP still stores demo data
-in-memory; PostgreSQL wiring is the next backend step.
+in PostgreSQL. Local Postgres is exposed on `localhost:5433` to avoid conflicts
+with a system Postgres on `5432`.
 
 ## Demo Flow
 
@@ -147,6 +161,8 @@ GET  /api/v1/trips/{trip_id}
 GET  /api/v1/balance
 POST /api/v1/balance/top-up
 GET  /api/v1/balance/transactions
+GET  /api/v1/balance/autopay
+PATCH /api/v1/balance/autopay
 ```
 
 Dashboard:
@@ -154,6 +170,19 @@ Dashboard:
 ```text
 GET /api/v1/dashboard
 ```
+
+Feed and debts:
+
+```text
+GET /api/v1/feed?type=all|trips|payments|overdues
+GET /api/v1/debts
+GET /api/v1/debts/summary
+```
+
+`/dashboard` is shaped for the mobile home screen and includes balance,
+autopay, forecast, overdue summary, primary vehicle, recent trips,
+notifications, and recommendations. Transponder-specific blocks are intentionally
+not modeled yet.
 
 Notifications:
 

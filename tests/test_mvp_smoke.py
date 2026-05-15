@@ -47,3 +47,15 @@ def test_mvp_demo_flow() -> None:
     assert dashboard.status_code == 200
     assert dashboard.json()["notifications"]
     assert dashboard.json()["recommendations"]
+    assert "recent_trips" in dashboard.json()
+    assert "debts_summary" in dashboard.json()
+
+    feed = client.get("/api/v1/feed?type=all", headers=headers)
+    assert feed.status_code == 200
+    assert "items" in feed.json()
+
+    autopay = client.get("/api/v1/balance/autopay", headers=headers)
+    assert autopay.status_code == 200
+
+    debts = client.get("/api/v1/debts/summary", headers=headers)
+    assert debts.status_code == 200

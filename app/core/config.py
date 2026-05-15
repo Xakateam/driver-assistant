@@ -10,6 +10,13 @@ def _getenv_list(key: str, default: list[str]) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _getenv_optional(key: str) -> str | None:
+    value = os.getenv(key)
+    if not value:
+        return None
+    return value.strip() or None
+
+
 @dataclass(frozen=True)
 class Settings:
     PROJECT_NAME: str = field(
@@ -23,7 +30,7 @@ class Settings:
     DATABASE_URL: str = field(
         default_factory=lambda: os.getenv(
             "DATABASE_URL",
-            "postgresql+psycopg://driver:driver@localhost:5432/driver_assistant",
+            "postgresql+psycopg://driver:driver@localhost:5433/driver_assistant",
         )
     )
     JWT_SECRET_KEY: str = field(
@@ -36,6 +43,13 @@ class Settings:
 
     BACKEND_CORS_ORIGINS: list[str] = field(
         default_factory=lambda: _getenv_list("BACKEND_CORS_ORIGINS", ["*"])
+    )
+    SENTRY_DSN: str | None = field(default_factory=lambda: _getenv_optional("SENTRY_DSN"))
+    SENTRY_ENVIRONMENT: str = field(
+        default_factory=lambda: os.getenv("SENTRY_ENVIRONMENT", "local")
+    )
+    SENTRY_TRACES_SAMPLE_RATE: float = field(
+        default_factory=lambda: float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0"))
     )
 
 

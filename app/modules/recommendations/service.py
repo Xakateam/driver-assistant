@@ -1,6 +1,10 @@
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from threading import RLock
+from dataclasses import dataclass
+from datetime import UTC, datetime
+
+from sqlalchemy import select
+
+from app.core.database import SessionLocal
+from app.db.models import RecommendationORM
 
 
 @dataclass
@@ -14,28 +18,25 @@ class Recommendation:
     priority: int
     created_at: str
     decided_at: str | None = None
-    metadata: dict[str, object] = field(default_factory=dict)
+    metadata: dict[str, object] | None = None
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def _now() -> datetime:
+    return datetime.now(UTC)
 
 
 class RecommendationService:
-    def __init__(self) -> None:
-        self._lock = RLock()
-        self._recommendations_by_user: dict[str, dict[str, Recommendation]] = {}
-
     def list_recommendations(self, *, user_id: str) -> list[dict[str, object]]:
-        with self._lock:
-            self._ensure_seed_recommendations(user_id)
-            recommendations = self._recommendations_by_user[user_id].values()
+        with SessionLocal() as db:
+            self._ensure_seed_recommendations(db, user_id)
+            recommendations = db.scalars(
+                select(RecommendationORM)
+                .where(RecommendationORM.user_id == user_id)
+                .order_by(RecommendationORM.priority, RecommendationORM.created_at.desc())
+            ).all()
             return [
-                asdict(recommendation)
-                for recommendation in sorted(
-                    recommendations,
-                    key=lambda item: (item.status != "pending", item.priority),
-                )
+                self._recommendation_to_dict(recommendation)
+                for recommendation in recommendations
             ]
 
     def accept(self, *, user_id: str, recommendation_id: str) -> dict[str, object] | None:
@@ -53,8 +54,9 @@ class RecommendationService:
         )
 
     def reset(self) -> None:
-        with self._lock:
-            self._recommendations_by_user.clear()
+        with SessionLocal() as db:
+            db.query(RecommendationORM).delete()
+            db.commit()
 
     def _set_status(
         self,
@@ -63,50 +65,73 @@ class RecommendationService:
         recommendation_id: str,
         status: str,
     ) -> dict[str, object] | None:
-        with self._lock:
-            self._ensure_seed_recommendations(user_id)
-            recommendation = self._recommendations_by_user[user_id].get(
-                recommendation_id,
-            )
-            if recommendation is None:
+        with SessionLocal() as db:
+            recommendation = db.get(RecommendationORM, recommendation_id)
+            if recommendation is None or recommendation.user_id != user_id:
                 return None
             recommendation.status = status
             recommendation.decided_at = _now()
-            return asdict(recommendation)
+            db.commit()
+            db.refresh(recommendation)
+            return self._recommendation_to_dict(recommendation)
 
-    def _ensure_seed_recommendations(self, user_id: str) -> None:
-        if user_id in self._recommendations_by_user:
+    @staticmethod
+    def _ensure_seed_recommendations(db, user_id: str) -> None:
+        has_recommendations = db.scalar(
+            select(RecommendationORM.id)
+            .where(RecommendationORM.user_id == user_id)
+            .limit(1)
+        )
+        if has_recommendations:
             return
+        db.add_all(
+            [
+                RecommendationORM(
+                    id=f"demo-offpeak-{user_id[:8]}",
+                    user_id=user_id,
+                    type="offpeak_departure",
+                    title="Сдвиньте выезд на 20 минут",
+                    body=(
+                        "Поездка после 10:20 обычно дешевле и снижает риск "
+                        "пополнения баланса в дороге."
+                    ),
+                    priority=1,
+                    metadata_json={
+                        "estimated_saving_percent": 12,
+                        "suggested_time": "10:20",
+                    },
+                ),
+                RecommendationORM(
+                    id=f"demo-topup-{user_id[:8]}",
+                    user_id=user_id,
+                    type="balance_topup",
+                    title="Пополните баланс заранее",
+                    body=(
+                        "Рекомендуем пополнить баланс на 1000 ₽ "
+                        "до следующей регулярной поездки."
+                    ),
+                    priority=2,
+                    metadata_json={"amount": 1000, "currency": "RUB"},
+                ),
+            ]
+        )
+        db.commit()
 
-        self._recommendations_by_user[user_id] = {
-            "demo-offpeak": Recommendation(
-                id="demo-offpeak",
-                user_id=user_id,
-                type="offpeak_departure",
-                title="Сдвиньте выезд на 20 минут",
-                body=(
-                    "Поездка после 10:20 обычно дешевле и снижает риск "
-                    "пополнения баланса в дороге."
-                ),
-                status="pending",
-                priority=1,
-                created_at=_now(),
-                metadata={"estimated_saving_percent": 12, "suggested_time": "10:20"},
-            ),
-            "demo-topup": Recommendation(
-                id="demo-topup",
-                user_id=user_id,
-                type="balance_topup",
-                title="Пополните баланс заранее",
-                body=(
-                    "Рекомендуем пополнить баланс на 1000 ₽ "
-                    "до следующей регулярной поездки."
-                ),
-                status="pending",
-                priority=2,
-                created_at=_now(),
-                metadata={"amount": 1000, "currency": "RUB"},
-            ),
+    @staticmethod
+    def _recommendation_to_dict(recommendation: RecommendationORM) -> dict[str, object]:
+        return {
+            "id": recommendation.id,
+            "user_id": recommendation.user_id,
+            "type": recommendation.type,
+            "title": recommendation.title,
+            "body": recommendation.body,
+            "status": recommendation.status,
+            "priority": recommendation.priority,
+            "created_at": recommendation.created_at.isoformat(),
+            "decided_at": recommendation.decided_at.isoformat()
+            if recommendation.decided_at
+            else None,
+            "metadata": recommendation.metadata_json,
         }
 
 

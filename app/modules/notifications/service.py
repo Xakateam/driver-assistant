@@ -1,7 +1,11 @@
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from threading import RLock
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from uuid import uuid4
+
+from sqlalchemy import select
+
+from app.core.database import SessionLocal
+from app.db.models import DeviceTokenORM, NotificationORM
 
 
 @dataclass
@@ -27,7 +31,7 @@ class Notification:
     read_at: str | None = None
     action: str | None = None
     action_at: str | None = None
-    metadata: dict[str, object] = field(default_factory=dict)
+    metadata: dict[str, object] | None = None
 
 
 @dataclass
@@ -40,15 +44,12 @@ class NotificationRule:
     placeholder: bool = True
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def _now() -> datetime:
+    return datetime.now(UTC)
 
 
 class NotificationService:
     def __init__(self) -> None:
-        self._lock = RLock()
-        self._devices_by_user: dict[str, dict[str, DeviceToken]] = {}
-        self._notifications_by_user: dict[str, dict[str, Notification]] = {}
         self._rules: dict[str, NotificationRule] = self._default_rules()
 
     @staticmethod
@@ -105,44 +106,42 @@ class NotificationService:
         platform: str,
         fcm_token: str,
     ) -> dict[str, object]:
-        with self._lock:
-            now = _now()
-            devices = self._devices_by_user.setdefault(user_id, {})
-            existing = devices.get(fcm_token)
+        with SessionLocal() as db:
+            existing = db.scalar(
+                select(DeviceTokenORM).where(
+                    DeviceTokenORM.user_id == user_id,
+                    DeviceTokenORM.fcm_token == fcm_token,
+                )
+            )
             if existing is None:
-                existing = DeviceToken(
-                    id=f"device-{uuid4().hex[:12]}",
+                existing = DeviceTokenORM(
                     user_id=user_id,
                     platform=platform,
                     fcm_token=fcm_token,
-                    created_at=now,
-                    updated_at=now,
                 )
-                devices[fcm_token] = existing
+                db.add(existing)
             else:
                 existing.platform = platform
-                existing.updated_at = now
-
+                existing.updated_at = _now()
+            db.commit()
+            db.refresh(existing)
             return {
                 "id": existing.id,
                 "status": "registered",
                 "platform": existing.platform,
-                "created_at": existing.created_at,
-                "updated_at": existing.updated_at,
+                "created_at": existing.created_at.isoformat(),
+                "updated_at": existing.updated_at.isoformat(),
             }
 
     def list_notifications(self, *, user_id: str) -> list[dict[str, object]]:
-        with self._lock:
-            self._ensure_seed_notifications(user_id)
-            notifications = self._notifications_by_user[user_id].values()
-            return [
-                self._notification_to_dict(notification)
-                for notification in sorted(
-                    notifications,
-                    key=lambda item: item.created_at,
-                    reverse=True,
-                )
-            ]
+        with SessionLocal() as db:
+            self._ensure_seed_notifications(db, user_id)
+            notifications = db.scalars(
+                select(NotificationORM)
+                .where(NotificationORM.user_id == user_id)
+                .order_by(NotificationORM.created_at.desc())
+            ).all()
+            return [self._notification_to_dict(notification) for notification in notifications]
 
     def create_notification(
         self,
@@ -154,9 +153,8 @@ class NotificationService:
         deep_link: str | None = None,
         metadata: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        with self._lock:
-            self._ensure_seed_notifications(user_id)
-            notification = Notification(
+        with SessionLocal() as db:
+            notification = NotificationORM(
                 id=f"notification-{uuid4().hex[:12]}",
                 user_id=user_id,
                 type=type,
@@ -164,10 +162,11 @@ class NotificationService:
                 body=body,
                 deep_link=deep_link,
                 status="unread",
-                created_at=_now(),
-                metadata=metadata or {},
+                metadata_json=metadata or {},
             )
-            self._notifications_by_user[user_id][notification.id] = notification
+            db.add(notification)
+            db.commit()
+            db.refresh(notification)
             return self._notification_to_dict(notification)
 
     def get_notification(
@@ -176,10 +175,9 @@ class NotificationService:
         user_id: str,
         notification_id: str,
     ) -> dict[str, object] | None:
-        with self._lock:
-            self._ensure_seed_notifications(user_id)
-            notification = self._notifications_by_user[user_id].get(notification_id)
-            if notification is None:
+        with SessionLocal() as db:
+            notification = db.get(NotificationORM, notification_id)
+            if notification is None or notification.user_id != user_id:
                 return None
             return self._notification_to_dict(notification)
 
@@ -189,14 +187,14 @@ class NotificationService:
         user_id: str,
         notification_id: str,
     ) -> dict[str, object] | None:
-        with self._lock:
-            self._ensure_seed_notifications(user_id)
-            notification = self._notifications_by_user[user_id].get(notification_id)
-            if notification is None:
+        with SessionLocal() as db:
+            notification = db.get(NotificationORM, notification_id)
+            if notification is None or notification.user_id != user_id:
                 return None
-            if notification.status != "read":
-                notification.status = "read"
-                notification.read_at = _now()
+            notification.status = "read"
+            notification.read_at = _now()
+            db.commit()
+            db.refresh(notification)
             return self._notification_to_dict(notification)
 
     def save_action(
@@ -206,70 +204,87 @@ class NotificationService:
         notification_id: str,
         action: str,
     ) -> dict[str, object] | None:
-        with self._lock:
-            self._ensure_seed_notifications(user_id)
-            notification = self._notifications_by_user[user_id].get(notification_id)
-            if notification is None:
+        with SessionLocal() as db:
+            notification = db.get(NotificationORM, notification_id)
+            if notification is None or notification.user_id != user_id:
                 return None
             notification.action = action
             notification.action_at = _now()
+            db.commit()
+            db.refresh(notification)
             return {
                 "id": notification.id,
                 "action": notification.action,
                 "status": "saved",
-                "action_at": notification.action_at,
+                "action_at": notification.action_at.isoformat(),
             }
 
     def list_rules(self) -> list[dict[str, object]]:
-        with self._lock:
-            return [asdict(rule) for rule in self._rules.values()]
+        return [asdict(rule) for rule in self._rules.values()]
 
     def update_rule(self, *, rule_id: str, enabled: bool) -> dict[str, object] | None:
-        with self._lock:
-            rule = self._rules.get(rule_id)
-            if rule is None:
-                return None
-            rule.enabled = enabled
-            return asdict(rule)
+        rule = self._rules.get(rule_id)
+        if rule is None:
+            return None
+        rule.enabled = enabled
+        return asdict(rule)
 
     def reset(self) -> None:
-        with self._lock:
-            self._devices_by_user.clear()
-            self._notifications_by_user.clear()
-            self._rules = self._default_rules()
-
-    def _ensure_seed_notifications(self, user_id: str) -> None:
-        if user_id in self._notifications_by_user:
-            return
-
-        self._notifications_by_user[user_id] = {
-            "demo-low-balance": Notification(
-                id="demo-low-balance",
-                user_id=user_id,
-                type="low_balance_forecast",
-                title="Баланс скоро закончится",
-                body="При текущем темпе поездок средств хватит примерно на 4 дня.",
-                deep_link="driverassistant://topup?amount=1000",
-                status="unread",
-                created_at=_now(),
-                metadata={"forecast_days_left": 4, "suggested_topup": 1000},
-            ),
-            "demo-recommendation": Notification(
-                id="demo-recommendation",
-                user_id=user_id,
-                type="recommendation_available",
-                title="Есть способ сократить расходы",
-                body="Посмотрите рекомендацию по более выгодному времени поездок.",
-                deep_link="driverassistant://recommendations/demo-offpeak",
-                status="unread",
-                created_at=_now(),
-                metadata={"recommendation_id": "demo-offpeak"},
-            ),
-        }
+        with SessionLocal() as db:
+            db.query(DeviceTokenORM).delete()
+            db.query(NotificationORM).delete()
+            db.commit()
+        self._rules = self._default_rules()
 
     @staticmethod
-    def _notification_to_dict(notification: Notification) -> dict[str, object]:
-        return asdict(notification)
+    def _ensure_seed_notifications(db, user_id: str) -> None:
+        has_notifications = db.scalar(
+            select(NotificationORM.id).where(NotificationORM.user_id == user_id).limit(1)
+        )
+        if has_notifications:
+            return
+        db.add_all(
+            [
+                NotificationORM(
+                    id=f"demo-low-balance-{user_id[:8]}",
+                    user_id=user_id,
+                    type="low_balance_forecast",
+                    title="Баланс скоро закончится",
+                    body="При текущем темпе поездок средств хватит примерно на 4 дня.",
+                    deep_link="driverassistant://topup?amount=1000",
+                    metadata_json={"forecast_days_left": 4, "suggested_topup": 1000},
+                ),
+                NotificationORM(
+                    id=f"demo-recommendation-{user_id[:8]}",
+                    user_id=user_id,
+                    type="recommendation_available",
+                    title="Есть способ сократить расходы",
+                    body="Посмотрите рекомендацию по более выгодному времени поездок.",
+                    deep_link="driverassistant://recommendations/demo-offpeak",
+                    metadata_json={"recommendation_id": "demo-offpeak"},
+                ),
+            ]
+        )
+        db.commit()
+
+    @staticmethod
+    def _notification_to_dict(notification: NotificationORM) -> dict[str, object]:
+        return {
+            "id": notification.id,
+            "user_id": notification.user_id,
+            "type": notification.type,
+            "title": notification.title,
+            "body": notification.body,
+            "deep_link": notification.deep_link,
+            "status": notification.status,
+            "created_at": notification.created_at.isoformat(),
+            "read_at": notification.read_at.isoformat() if notification.read_at else None,
+            "action": notification.action,
+            "action_at": notification.action_at.isoformat()
+            if notification.action_at
+            else None,
+            "metadata": notification.metadata_json,
+        }
 
 
 notification_service = NotificationService()

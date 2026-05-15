@@ -1,3 +1,3 @@
-from app.core.store import store
+from app.core.database import SessionLocal
 
-__all__ = ["store"]
+__all__ = ["SessionLocal"]

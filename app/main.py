@@ -4,18 +4,38 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
-from app.core.config import settings
+from app.core.config import Settings, settings
+from app.core.database import init_db
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
+
+
+def init_sentry(app_settings: Settings = settings) -> None:
+    if not app_settings.SENTRY_DSN:
+        return
+
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+
+    sentry_sdk.init(
+        dsn=app_settings.SENTRY_DSN,
+        environment=app_settings.SENTRY_ENVIRONMENT,
+        traces_sample_rate=app_settings.SENTRY_TRACES_SAMPLE_RATE,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    init_db()
     yield
 
 
 def create_app() -> FastAPI:
+    init_sentry()
+
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
