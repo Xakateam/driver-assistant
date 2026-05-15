@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Test and lint
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: driver
+          POSTGRES_PASSWORD: driver
+          POSTGRES_DB: driver_assistant
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U driver -d driver_assistant"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://driver:driver@localhost:5432/driver_assistant
+      JWT_SECRET_KEY: ci-secret
+      SENTRY_DSN: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: python -m ruff check app tests
+
+      - name: Test
+        run: python -m pytest -q
