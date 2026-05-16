@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,7 +23,7 @@ class TripOut(ApiModel):
     distance_km: float
     amount: float
     currency: str = "RUB"
-    status: str
+    status: Literal["paid", "debt"]
 
 
 class BalanceOut(ApiModel):
@@ -42,7 +42,7 @@ class TransactionOut(ApiModel):
 
 
 class TopUpOut(ApiModel):
-    status: str
+    status: Literal["success"]
     balance: BalanceOut
     transaction: TransactionOut
 
@@ -61,7 +61,7 @@ class DebtOut(ApiModel):
     road_name: str
     amount: float
     currency: str = "RUB"
-    status: str
+    status: Literal["overdue"]
     due_text: str
     deep_link: str
     created_at: datetime
@@ -76,7 +76,7 @@ class DebtSummaryOut(ApiModel):
 
 class DeviceRegisterOut(ApiModel):
     id: str
-    status: str
+    status: Literal["registered"]
     platform: str
     created_at: datetime
     updated_at: datetime
@@ -89,7 +89,7 @@ class NotificationOut(ApiModel):
     title: str
     body: str
     deep_link: str | None
-    status: str
+    status: Literal["unread", "read"]
     created_at: datetime
     read_at: datetime | None
     action: str | None
@@ -100,7 +100,7 @@ class NotificationOut(ApiModel):
 class NotificationActionOut(ApiModel):
     id: str
     action: str
-    status: str
+    status: Literal["saved"]
     action_at: datetime
 
 
@@ -120,7 +120,7 @@ class RecommendationOut(ApiModel):
     category_id: int
     title: str
     body: str
-    status: str
+    status: Literal["pending", "accepted", "declined"]
     priority: int
     predicted_ctr: float = Field(ge=0, le=1)
     created_at: datetime
@@ -151,6 +151,26 @@ class PrimaryVehicleOut(ApiModel):
     plate_number: str
     name: str | None
     is_primary: bool
+
+
+class FeedItemOut(ApiModel):
+    id: str
+    kind: Literal["trip", "overdue", "payment"]
+    title: str
+    subtitle: str
+    amount: float
+    currency: str = "RUB"
+    status: Literal["paid", "debt", "success"]
+    occurred_at: datetime
+    deep_link: str
+    metadata: Metadata = Field(default_factory=dict)
+
+
+class FeedOut(ApiModel):
+    items: list[FeedItemOut]
+    limit: int = Field(ge=1, le=100)
+    offset: int = Field(ge=0)
+    total: int = Field(ge=0)
 
 
 class DashboardOut(ApiModel):
