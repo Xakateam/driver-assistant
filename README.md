@@ -23,6 +23,7 @@ Local API:
 
 ```text
 Swagger:  http://127.0.0.1:8000/docs
+Admin:    http://127.0.0.1:8000/admin-panel
 OpenAPI:  http://127.0.0.1:8000/api/v1/openapi.json
 Health:   http://127.0.0.1:8000/health
 Postgres: localhost:5433

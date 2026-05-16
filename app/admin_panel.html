@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Driver Assistant Admin</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f6f8;
+      color: #172033;
+    }
+    body { margin: 0; }
+    header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      background: #101a2f;
+      color: white;
+    }
+    h1 { font-size: 20px; margin: 0; }
+    main {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 16px;
+      padding: 16px;
+    }
+    section, form {
+      background: white;
+      border: 1px solid #dfe3ea;
+      border-radius: 8px;
+      padding: 14px;
+    }
+    h2, h3 { margin: 0 0 12px; }
+    h2 { font-size: 16px; }
+    h3 { font-size: 14px; }
+    input, select, textarea, button {
+      box-sizing: border-box;
+      width: 100%;
+      border: 1px solid #cfd6e3;
+      border-radius: 6px;
+      padding: 9px 10px;
+      font: inherit;
+    }
+    textarea { min-height: 70px; resize: vertical; }
+    button {
+      border: 0;
+      background: #173b87;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.secondary { background: #edf1f7; color: #172033; }
+    button.warn { background: #c2410c; }
+    label { display: grid; gap: 5px; font-size: 12px; color: #536073; }
+    .stack { display: grid; gap: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .users { display: grid; gap: 8px; margin-top: 12px; }
+    .user-row {
+      display: grid;
+      gap: 4px;
+      padding: 10px;
+      border: 1px solid #dfe3ea;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #fbfcfe;
+    }
+    .user-row.active { border-color: #173b87; background: #eef4ff; }
+    .muted { color: #6b7280; font-size: 12px; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .metric {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .metric strong { display: block; font-size: 22px; }
+    pre {
+      overflow: auto;
+      max-height: 320px;
+      background: #101827;
+      color: #d9e4ff;
+      padding: 12px;
+      border-radius: 8px;
+    }
+    .panel { display: grid; gap: 16px; }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    @media (max-width: 980px) {
+      main, .grid, .metric-grid, .two { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Driver Assistant Admin</h1>
+    <label style="max-width: 360px; color: white;">
+      X-Admin-API-Key
+      <input id="adminKey" placeholder="optional" />
+    </label>
+  </header>
+  <main>
+    <section>
+      <h2>Users</h2>
+      <form id="createUserForm" class="stack">
+        <label>Phone <input name="phone" value="+79990000000" /></label>
+        <label>Plate <input name="plate_number" value="А123ВС777" /></label>
+        <label>Vehicle <input name="vehicle_name" value="Kia Rio" /></label>
+        <button>Create / open user</button>
+      </form>
+      <button id="refreshUsers" class="secondary" style="margin-top: 10px;">Refresh users</button>
+      <div id="users" class="users"></div>
+    </section>
+    <div class="panel">
+      <section>
+        <h2 id="selectedTitle">Select user</h2>
+        <div class="metric-grid">
+          <div class="metric"><span class="muted">Balance</span><strong id="balance">-</strong></div>
+          <div class="metric"><span class="muted">Debts</span><strong id="debts">-</strong></div>
+          <div class="metric"><span class="muted">ML segment</span><strong id="segment">-</strong></div>
+          <div class="metric"><span class="muted">Forecast</span><strong id="forecast">-</strong></div>
+        </div>
+      </section>
+
+      <section class="stack">
+        <h2>Demo actions</h2>
+        <div class="grid">
+          <form data-action="topup" class="stack">
+            <h3>Top up</h3>
+            <label>Amount <input name="amount" type="number" value="1000" /></label>
+            <button>Top up</button>
+          </form>
+          <form data-action="balance" class="stack">
+            <h3>Set balance</h3>
+            <label>Amount <input name="amount" type="number" value="120" /></label>
+            <button>Set balance</button>
+          </form>
+          <form data-action="trip" class="stack">
+            <h3>Create trip</h3>
+            <label>Status
+              <select name="status"><option>paid</option><option>debt</option></select>
+            </label>
+            <label>Amount <input name="amount" type="number" value="220" /></label>
+            <button>Create trip</button>
+          </form>
+        </div>
+        <div class="two">
+          <form id="scenarioForm" class="stack">
+            <h3>Scenario</h3>
+            <label>Scenario
+              <select name="scenario">
+                <option value="low_balance">low_balance</option>
+                <option value="debt_user">debt_user</option>
+                <option value="heavy_commuter">heavy_commuter</option>
+                <option value="weekend_driver">weekend_driver</option>
+              </select>
+            </label>
+            <button>Apply scenario</button>
+          </form>
+          <form id="mlForm" class="stack">
+            <h3>ML</h3>
+            <button>Recalculate user ML</button>
+          </form>
+        </div>
+      </section>
+
+      <section>
+        <h2>Custom notification</h2>
+        <form id="notificationForm" class="stack">
+          <label>Type <input name="type" value="admin_message" /></label>
+          <label>Title <input name="title" value="Проверка уведомлений" /></label>
+          <label>Body <textarea name="body">Если видишь это сообщение, пуши работают.</textarea></label>
+          <label>Deep link <input name="deep_link" value="driverassistant://notifications" /></label>
+          <button>Send notification</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>Selected user snapshot</h2>
+        <pre id="snapshot">{}</pre>
+      </section>
+    </div>
+  </main>
+  <script>
+    let selectedUserId = null;
+    const keyInput = document.getElementById("adminKey");
+    keyInput.value = localStorage.getItem("adminKey") || "";
+    keyInput.addEventListener("input", () => localStorage.setItem("adminKey", keyInput.value));
+
+    function headers() {
+      const result = {"Content-Type": "application/json"};
+      if (keyInput.value) result["X-Admin-API-Key"] = keyInput.value;
+      return result;
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(`/api/v1/admin${path}`, {
+        ...options,
+        headers: {...headers(), ...(options.headers || {})},
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || response.statusText);
+      return payload;
+    }
+
+    async function refreshUsers() {
+      const payload = await api("/users");
+      const root = document.getElementById("users");
+      root.innerHTML = "";
+      payload.items.forEach(user => {
+        const row = document.createElement("div");
+        row.className = `user-row ${user.id === selectedUserId ? "active" : ""}`;
+        row.innerHTML = `<strong>${user.phone}</strong><span class="muted">${user.id}</span><span>${user.balance.amount} ₽ · debts ${user.debts_summary.amount} ₽</span>`;
+        row.onclick = () => selectUser(user.id);
+        root.appendChild(row);
+      });
+    }
+
+    async function selectUser(userId) {
+      selectedUserId = userId;
+      const payload = await api(`/users/${userId}`);
+      const user = payload.user;
+      document.getElementById("selectedTitle").textContent = `${user.phone} · ${user.id}`;
+      document.getElementById("balance").textContent = `${user.balance.amount} ₽`;
+      document.getElementById("debts").textContent = `${user.debts_summary.amount} ₽`;
+      document.getElementById("segment").textContent = user.ml_cluster_name || user.segment;
+      document.getElementById("forecast").textContent = `${user.predicted_spend_next_month || 0} ₽`;
+      document.getElementById("snapshot").textContent = JSON.stringify(payload, null, 2);
+      refreshUsers();
+    }
+
+    document.getElementById("refreshUsers").onclick = refreshUsers;
+    document.getElementById("createUserForm").onsubmit = async (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(event.target).entries());
+      const payload = await api("/users", {method: "POST", body: JSON.stringify(data)});
+      selectedUserId = payload.user.id;
+      await refreshUsers();
+      await selectUser(selectedUserId);
+    };
+
+    document.querySelector('[data-action="topup"]').onsubmit = async (event) => {
+      event.preventDefault();
+      if (!selectedUserId) return alert("Select user");
+      const amount = Number(new FormData(event.target).get("amount"));
+      await api(`/users/${selectedUserId}/top-up`, {method: "POST", body: JSON.stringify({amount, payment_method: "admin_panel"})});
+      await selectUser(selectedUserId);
+    };
+
+    document.querySelector('[data-action="balance"]').onsubmit = async (event) => {
+      event.preventDefault();
+      if (!selectedUserId) return alert("Select user");
+      const amount = Number(new FormData(event.target).get("amount"));
+      await api(`/users/${selectedUserId}/balance`, {method: "POST", body: JSON.stringify({amount})});
+      await selectUser(selectedUserId);
+    };
+
+    document.querySelector('[data-action="trip"]').onsubmit = async (event) => {
+      event.preventDefault();
+      if (!selectedUserId) return alert("Select user");
+      const form = new FormData(event.target);
+      const body = {status: form.get("status"), amount: Number(form.get("amount"))};
+      const path = body.status === "debt" ? "debts" : "trips";
+      await api(`/users/${selectedUserId}/${path}`, {method: "POST", body: JSON.stringify(body)});
+      await selectUser(selectedUserId);
+    };
+
+    document.getElementById("scenarioForm").onsubmit = async (event) => {
+      event.preventDefault();
+      if (!selectedUserId) return alert("Select user");
+      const user = (await api(`/users/${selectedUserId}`)).user;
+      const scenario = new FormData(event.target).get("scenario");
+      await api(`/demo/scenarios/${scenario}`, {method: "POST", body: JSON.stringify({phone: user.phone, send_push: true})});
+      await selectUser(selectedUserId);
+    };
+
+    document.getElementById("mlForm").onsubmit = async (event) => {
+      event.preventDefault();
+      if (!selectedUserId) return alert("Select user");
+      await api(`/users/${selectedUserId}/ml/recalculate`, {method: "POST"});
+      await selectUser(selectedUserId);
+    };
+
+    document.getElementById("notificationForm").onsubmit = async (event) => {
+      event.preventDefault();
+      if (!selectedUserId) return alert("Select user");
+      const form = Object.fromEntries(new FormData(event.target).entries());
+      await api("/notifications/send", {
+        method: "POST",
+        body: JSON.stringify({...form, user_id: selectedUserId, ignore_quiet_hours: true, metadata: {source: "admin_panel"}}),
+      });
+      await selectUser(selectedUserId);
+    };
+
+    refreshUsers().catch(error => alert(error.message));
+  </script>
+</body>
+</html>

@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
@@ -80,6 +82,11 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["Health"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/admin-panel", response_class=HTMLResponse, tags=["Admin"])
+    async def admin_panel() -> str:
+        panel_path = Path(__file__).with_name("admin_panel.html")
+        return panel_path.read_text(encoding="utf-8")
 
     return app
 
