@@ -1,16 +1,18 @@
-from fastapi import APIRouter, HTTPException
+import os
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.v1.schemas import Metadata
+from app.core.config import settings
 from app.core.database import SessionLocal, seed_demo_data as seed_db_demo_data
 from app.db.models import UserORM
 from app.modules.ml import service as ml_service
 from app.modules.notifications.scheduler import run_notification_tick
 from app.modules.notifications.service import notification_service
 from app.modules.recommendations.service import recommendation_service
-
-router = APIRouter()
 
 
 class AdminNotificationSendIn(BaseModel):
@@ -23,6 +25,26 @@ class AdminNotificationSendIn(BaseModel):
     deep_link: str | None = None
     metadata: Metadata = Field(default_factory=dict)
     ignore_quiet_hours: bool = False
+
+
+async def require_admin_api_key(
+    x_admin_api_key: Annotated[str | None, Header(alias="X-Admin-API-Key")] = None,
+) -> None:
+    expected_key = _expected_admin_api_key()
+    if expected_key is None:
+        return
+    if x_admin_api_key != expected_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid admin API key",
+        )
+
+
+def _expected_admin_api_key() -> str | None:
+    return os.getenv("ADMIN_API_KEY") or settings.ADMIN_API_KEY
+
+
+router = APIRouter(dependencies=[Depends(require_admin_api_key)])
 
 
 @router.get("/status")

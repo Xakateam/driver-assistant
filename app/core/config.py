@@ -51,6 +51,9 @@ class Settings:
     BACKEND_CORS_ORIGINS: list[str] = field(
         default_factory=lambda: _getenv_list("BACKEND_CORS_ORIGINS", ["*"])
     )
+    ADMIN_API_KEY: str | None = field(
+        default_factory=lambda: _getenv_optional("ADMIN_API_KEY")
+    )
     SENTRY_DSN: str | None = field(default_factory=lambda: _getenv_optional("SENTRY_DSN"))
     SENTRY_ENVIRONMENT: str = field(
         default_factory=lambda: os.getenv("SENTRY_ENVIRONMENT", "local")

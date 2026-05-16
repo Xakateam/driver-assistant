@@ -43,6 +43,7 @@ def recalculate_all() -> dict[str, object]:
         "processed_users": processed_count,
         "users_total": len(user_ids),
         "model_version": MODEL_VERSION,
+        "source_summary": _source_summary(results),
         "results": results,
     }
 
@@ -61,8 +62,9 @@ def get_ml_status() -> dict[str, object]:
         )
 
     available_models = runtime_status["models"]
+    available_count = sum(1 for available in available_models.values() if available)
     return {
-        "status": "ready" if any(available_models.values()) else "fallback",
+        "status": _runtime_status_label(available_count, len(available_models)),
         "model_version": runtime_status["model_version"],
         "users_with_segments": segmented_count,
         "users_with_forecasts": forecasted_count,
@@ -121,3 +123,26 @@ def _nullable_int(value: object) -> int | None:
     if value is None:
         return None
     return int(value)
+
+
+def _runtime_status_label(available_count: int, total_count: int) -> str:
+    if available_count == total_count:
+        return "ready"
+    if available_count > 0:
+        return "partial"
+    return "fallback"
+
+
+def _source_summary(results: list[dict[str, object]]) -> dict[str, dict[str, int]]:
+    summary: dict[str, dict[str, int]] = {
+        "clustering": {},
+        "spend_prediction": {},
+    }
+    for result in results:
+        sources = result.get("sources")
+        if not isinstance(sources, dict):
+            continue
+        for key in summary:
+            source = str(sources.get(key, "unknown"))
+            summary[key][source] = summary[key].get(source, 0) + 1
+    return summary

@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.api.v1 import admin
 from app.main import app
 from app.modules.notifications.service import notification_service
 from app.modules.recommendations.service import recommendation_service
@@ -74,6 +75,21 @@ def test_notification_not_found_returns_404() -> None:
     response = client.get("/api/v1/notifications/missing")
 
     assert response.status_code == 404
+
+
+def test_admin_api_key_is_optional_but_enforced_when_configured(monkeypatch) -> None:
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
+    assert admin._expected_admin_api_key() is None
+    monkeypatch.setenv("ADMIN_API_KEY", "admin-secret")
+
+    without_key = client.get("/api/v1/admin/status")
+    assert without_key.status_code == 401
+
+    with_key = client.get(
+        "/api/v1/admin/status",
+        headers={"X-Admin-API-Key": "admin-secret"},
+    )
+    assert with_key.status_code == 200
 
 
 def test_recommendations_accept_decline_and_not_found() -> None:

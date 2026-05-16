@@ -47,6 +47,7 @@ python -m uvicorn app.main:app --reload
 | `JWT_ALGORITHM` | `HS256` | JWT signing algorithm. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token lifetime. |
 | `BACKEND_CORS_ORIGINS` | `*` | Comma-separated CORS origins. |
+| `ADMIN_API_KEY` | empty | Optional key for `/api/v1/admin/*`; send as `X-Admin-API-Key`. |
 | `SENTRY_DSN` | empty | Enables Sentry when set. |
 | `SENTRY_ENVIRONMENT` | `local` | Sentry environment name. |
 | `SENTRY_TRACES_SAMPLE_RATE` | `0.0` | Sentry tracing sample rate. |

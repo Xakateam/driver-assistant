@@ -11,11 +11,17 @@ def test_ml_status_reports_artifacts_and_fallback_runtime() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["status"] in {"ready", "fallback"}
+    assert payload["status"] in {"ready", "partial", "fallback"}
     assert payload["model_version"] == "ml_moscow_transport@4779dba"
     assert payload["runtime"]["artifacts"]["kmeans"]["exists"] is True
     assert payload["runtime"]["artifacts"]["spend_predictor"]["exists"] is True
     assert payload["runtime"]["artifacts"]["ctr"]["exists"] is True
+    assert "health" in payload["runtime"]
+    assert payload["runtime"]["health"]["spend_prediction"]["source"] in {
+        "model",
+        "fallback",
+    }
+    assert "load_error" in payload["runtime"]["health"]["recommendation_ctr"]
 
 
 def test_ml_recalculate_me_persists_profile_outputs() -> None:
