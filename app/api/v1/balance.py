@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserDep
+from app.api.v1.schemas import AutopayOut, BalanceOut, TopUpOut, TransactionOut
 from app.modules.billing import service
 
 router = APIRouter()
@@ -21,16 +22,16 @@ class AutopayUpdateIn(BaseModel):
     payment_method: str | None = None
 
 
-@router.get("")
-async def get_balance(current_user: CurrentUserDep) -> dict[str, object]:
+@router.get("", response_model=BalanceOut)
+async def get_balance(current_user: CurrentUserDep) -> BalanceOut:
     return service.get_balance(current_user.id)
 
 
-@router.post("/top-up")
+@router.post("/top-up", response_model=TopUpOut)
 async def top_up(
     payload: TopUpIn,
     current_user: CurrentUserDep,
-) -> dict[str, object]:
+) -> TopUpOut:
     return service.top_up(
         user_id=current_user.id,
         amount=float(payload.amount),
@@ -38,21 +39,21 @@ async def top_up(
     )
 
 
-@router.get("/transactions")
-async def get_transactions(current_user: CurrentUserDep) -> list[dict[str, object]]:
+@router.get("/transactions", response_model=list[TransactionOut])
+async def get_transactions(current_user: CurrentUserDep) -> list[TransactionOut]:
     return service.list_transactions(current_user.id)
 
 
-@router.get("/autopay")
-async def get_autopay(current_user: CurrentUserDep) -> dict[str, object]:
+@router.get("/autopay", response_model=AutopayOut)
+async def get_autopay(current_user: CurrentUserDep) -> AutopayOut:
     return service.get_autopay(current_user.id)
 
 
-@router.patch("/autopay")
+@router.patch("/autopay", response_model=AutopayOut)
 async def update_autopay(
     payload: AutopayUpdateIn,
     current_user: CurrentUserDep,
-) -> dict[str, object]:
+) -> AutopayOut:
     return service.update_autopay(
         user_id=current_user.id,
         enabled=payload.enabled,
