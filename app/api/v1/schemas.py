@@ -34,7 +34,7 @@ class BalanceOut(ApiModel):
 
 class TransactionOut(ApiModel):
     id: str
-    type: str
+    type: Literal["top_up", "trip_charge", "debt"]
     amount: float
     currency: str = "RUB"
     description: str

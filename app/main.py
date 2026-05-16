@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
             "Backend for a driver assistant app: auth, vehicles, trips, "
             "balance, notifications, recommendations, and ML adapters."
         ),
+        servers=[{"url": "/", "description": "Current API host"}],
         openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
         docs_url="/docs",
         redoc_url="/redoc",
