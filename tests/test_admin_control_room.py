@@ -45,6 +45,8 @@ def test_admin_control_room_user_actions_and_panel() -> None:
     assert debt.json()["entry_point"] == "А-107"
     assert debt.json()["exit_point"] == "М-7"
     assert debt.json()["distance_km"] == 41
+    assert debt.json()["notification"]["type"] == "debt_warning"
+    assert debt.json()["deliveries"][0]["status"] in {"sent", "skipped", "failed"}
 
     recalculate = client.post(f"/api/v1/admin/users/{user_id}/ml/recalculate")
     assert recalculate.status_code == 200

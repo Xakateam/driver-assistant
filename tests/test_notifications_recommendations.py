@@ -70,6 +70,12 @@ def test_notifications_device_read_action_and_rules() -> None:
         "none",
     }
 
+    notifications_after_send = client.get("/api/v1/notifications")
+    assert notifications_after_send.status_code == 200
+    latest = notifications_after_send.json()[0]
+    assert latest["metadata"]["delivery_status"] in {"sent", "skipped", "failed"}
+    assert latest["metadata"]["delivery_count"] >= 1
+
 
 def test_notification_not_found_returns_404() -> None:
     response = client.get("/api/v1/notifications/missing")

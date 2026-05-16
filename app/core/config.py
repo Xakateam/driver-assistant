@@ -74,7 +74,7 @@ class Settings:
         default_factory=lambda: _getenv_bool("NOTIFICATION_SCHEDULER_ENABLED", True)
     )
     NOTIFICATION_TICK_INTERVAL_SECONDS: int = field(
-        default_factory=lambda: int(os.getenv("NOTIFICATION_TICK_INTERVAL_SECONDS", "1800"))
+        default_factory=lambda: int(os.getenv("NOTIFICATION_TICK_INTERVAL_SECONDS", "120"))
     )
     NOTIFICATION_ALLOWED_START_HOUR: int = field(
         default_factory=lambda: int(os.getenv("NOTIFICATION_ALLOWED_START_HOUR", "9"))

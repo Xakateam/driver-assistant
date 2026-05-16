@@ -57,7 +57,7 @@ python -m uvicorn app.main:app --reload
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | empty | Path to Firebase service account JSON. |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | empty | Raw Firebase service account JSON. |
 | `NOTIFICATION_SCHEDULER_ENABLED` | `true` | Enables in-process notification ticks. |
-| `NOTIFICATION_TICK_INTERVAL_SECONDS` | `1800` | Notification tick interval. |
+| `NOTIFICATION_TICK_INTERVAL_SECONDS` | `120` | Notification tick interval. |
 | `NOTIFICATION_ALLOWED_START_HOUR` | `9` | First hour when scheduled pushes may be sent. |
 | `NOTIFICATION_ALLOWED_END_HOUR` | `21` | Hour when scheduled pushes stop. |
 | `NOTIFICATION_TIMEZONE` | `Europe/Moscow` | Timezone for quiet hours. |

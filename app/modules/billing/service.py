@@ -41,13 +41,14 @@ def top_up(user_id: str, amount: float, payment_method: str) -> dict[str, object
         db.commit()
         db.refresh(transaction)
 
-    notification_service.create_notification(
+    notification_service.dispatch_notification(
         user_id=user_id,
         type="topup_success",
         title="Баланс пополнен",
         body=f"На счет зачислено {amount:.0f} ₽.",
         deep_link="driverassistant://balance",
         metadata={"amount": amount, "payment_method": payment_method},
+        ignore_quiet_hours=True,
     )
     return {
         "status": "success",
@@ -144,13 +145,14 @@ def pay_debt(user_id: str, debt_id: str) -> dict[str, object] | None:
         db.commit()
         db.refresh(transaction)
 
-    notification_service.create_notification(
+    notification_service.dispatch_notification(
         user_id=user_id,
         type="debt_paid",
         title="Задолженность погашена",
         body=f"Оплата поездки {debt_id[:8]} на {transaction.amount * -1:.0f} ₽ прошла.",
         deep_link="driverassistant://debts",
         metadata={"debt_id": debt_id, "amount": abs(transaction.amount)},
+        ignore_quiet_hours=True,
     )
     return {
         "status": "paid",

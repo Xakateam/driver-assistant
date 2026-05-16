@@ -457,7 +457,7 @@ def _create_trip(user_id: str, payload: AdminTripCreateIn) -> dict[str, object]:
         db.add_all([trip, transaction])
         db.commit()
         db.refresh(trip)
-        return {
+        trip_payload = {
             "id": trip.id,
             "vehicle_id": trip.vehicle_id,
             "road_name": trip.road_name,
@@ -470,6 +470,8 @@ def _create_trip(user_id: str, payload: AdminTripCreateIn) -> dict[str, object]:
             "currency": "RUB",
             "status": trip.status,
         }
+    notification = _dispatch_trip_notification(user_id=user_id, trip=trip_payload)
+    return {**trip_payload, "notification": notification["notification"], "deliveries": notification["deliveries"]}
 
 
 def _set_balance(user_id: str, target_amount: float) -> None:
@@ -506,6 +508,38 @@ def _scenario_push(
         body=body,
         deep_link=deep_link,
         metadata={"scenario": type},
+        ignore_quiet_hours=True,
+    )
+
+
+def _dispatch_trip_notification(
+    *,
+    user_id: str,
+    trip: dict[str, object],
+) -> dict[str, object]:
+    is_debt = trip["status"] == "debt"
+    route = f"{trip['entry_point']} -> {trip['exit_point']}"
+    if is_debt:
+        title = "Новая неоплаченная поездка"
+        body = f"{route}: {float(trip['amount']):.0f} ₽. Погасите задолженность."
+        deep_link = f"driverassistant://debts/{trip['id']}"
+        notification_type = "debt_warning"
+    else:
+        title = "Новая поездка учтена"
+        body = f"{trip['road_name']}: {route}, {float(trip['amount']):.0f} ₽."
+        deep_link = f"driverassistant://trips/{trip['id']}"
+        notification_type = "trip_recorded"
+    return notification_service.dispatch_notification(
+        user_id=user_id,
+        type=notification_type,
+        title=title,
+        body=body,
+        deep_link=deep_link,
+        metadata={
+            "trip_id": str(trip["id"]),
+            "road_name": str(trip["road_name"]),
+            "amount": float(trip["amount"]),
+        },
         ignore_quiet_hours=True,
     )
 

@@ -99,6 +99,20 @@ class NotificationService:
                 enabled=True,
                 channel="push",
             ),
+            "debt_paid": NotificationRule(
+                id="debt_paid",
+                type="debt_paid",
+                title="Задолженность погашена",
+                enabled=True,
+                channel="push",
+            ),
+            "trip_recorded": NotificationRule(
+                id="trip_recorded",
+                type="trip_recorded",
+                title="Новая поездка",
+                enabled=True,
+                channel="push",
+            ),
         }
 
     def register_device(
@@ -221,13 +235,15 @@ class NotificationService:
         ignore_quiet_hours: bool = False,
     ) -> list[dict[str, object]]:
         if not ignore_quiet_hours and not is_notification_window_open():
-            return [
+            deliveries = [
                 {
                     "status": "skipped",
                     "reason": "quiet_hours",
                     "provider": "none",
                 }
             ]
+            self._store_delivery_summary(str(notification["id"]), deliveries)
+            return deliveries
 
         with SessionLocal() as db:
             tokens = db.scalars(
@@ -235,17 +251,19 @@ class NotificationService:
             ).all()
 
         if not tokens:
-            return [
+            deliveries = [
                 {
                     "status": "skipped",
                     "reason": "no_device_tokens",
                     "provider": "none",
                 }
             ]
+            self._store_delivery_summary(str(notification["id"]), deliveries)
+            return deliveries
 
         provider = get_push_provider()
         data = _notification_data(notification)
-        return [
+        deliveries = [
             provider.send(
                 token=device.fcm_token,
                 title=str(notification["title"]),
@@ -254,6 +272,9 @@ class NotificationService:
             )
             for device in tokens
         ]
+        self._cleanup_invalid_device_tokens(deliveries)
+        self._store_delivery_summary(str(notification["id"]), deliveries)
+        return deliveries
 
     def has_recent_notification(
         self,
@@ -347,6 +368,36 @@ class NotificationService:
         self._rules = self._default_rules()
 
     @staticmethod
+    def _cleanup_invalid_device_tokens(deliveries: list[dict[str, object]]) -> None:
+        invalid_tokens = [
+            str(delivery["token"])
+            for delivery in deliveries
+            if "token" in delivery and _is_invalid_fcm_token(delivery)
+        ]
+        if not invalid_tokens:
+            return
+        with SessionLocal() as db:
+            db.query(DeviceTokenORM).filter(
+                DeviceTokenORM.fcm_token.in_(invalid_tokens)
+            ).delete(synchronize_session=False)
+            db.commit()
+
+    @staticmethod
+    def _store_delivery_summary(
+        notification_id: str,
+        deliveries: list[dict[str, object]],
+    ) -> None:
+        summary = _delivery_summary(deliveries)
+        with SessionLocal() as db:
+            notification = db.get(NotificationORM, notification_id)
+            if notification is None:
+                return
+            metadata = dict(notification.metadata_json or {})
+            metadata.update(summary)
+            notification.metadata_json = metadata
+            db.commit()
+
+    @staticmethod
     def _ensure_seed_notifications(db, user_id: str) -> None:
         has_notifications = db.scalar(
             select(NotificationORM.id).where(NotificationORM.user_id == user_id).limit(1)
@@ -428,3 +479,71 @@ def _notification_data(notification: dict[str, object]) -> dict[str, str]:
             if isinstance(value, (str, int, float, bool)):
                 data[f"metadata_{key}"] = str(value)
     return data
+
+
+def _delivery_summary(deliveries: list[dict[str, object]]) -> dict[str, object]:
+    sent_count = sum(1 for delivery in deliveries if delivery.get("status") == "sent")
+    failed_count = sum(
+        1 for delivery in deliveries if delivery.get("status") == "failed"
+    )
+    skipped_count = sum(
+        1 for delivery in deliveries if delivery.get("status") == "skipped"
+    )
+    providers = sorted(
+        {
+            str(delivery.get("provider") or "none")
+            for delivery in deliveries
+            if delivery.get("provider") is not None
+        }
+    )
+    last_reason = next(
+        (
+            str(
+                delivery.get("reason")
+                or delivery.get("status_code")
+                or delivery.get("response")
+            )
+            for delivery in deliveries
+            if delivery.get("reason")
+            or delivery.get("status_code")
+            or delivery.get("response")
+        ),
+        None,
+    )
+    if sent_count and not failed_count and not skipped_count:
+        delivery_status = "sent"
+    elif sent_count:
+        delivery_status = "partial"
+    elif failed_count:
+        delivery_status = "failed"
+    elif skipped_count:
+        delivery_status = "skipped"
+    else:
+        delivery_status = "unknown"
+    summary: dict[str, object] = {
+        "delivery_status": delivery_status,
+        "delivery_provider": providers[0] if len(providers) == 1 else "mixed",
+        "delivery_count": len(deliveries),
+        "delivery_sent_count": sent_count,
+        "delivery_failed_count": failed_count,
+        "delivery_skipped_count": skipped_count,
+        "delivery_attempted_at": _now().isoformat(),
+    }
+    if last_reason:
+        summary["delivery_last_reason"] = last_reason[:180]
+    return summary
+
+
+def _is_invalid_fcm_token(delivery: dict[str, object]) -> bool:
+    if delivery.get("provider") != "fcm" or delivery.get("status") != "failed":
+        return False
+    response = str(delivery.get("response") or "").lower()
+    return any(
+        marker in response
+        for marker in (
+            "unregistered",
+            "registration-token-not-registered",
+            "invalid_argument",
+            "invalid registration token",
+        )
+    )
