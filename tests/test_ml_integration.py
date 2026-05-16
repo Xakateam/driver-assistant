@@ -37,7 +37,7 @@ def test_ml_recalculate_me_persists_profile_outputs() -> None:
 
 
 def test_recommendations_include_ctr_context() -> None:
-    response = client.get("/api/v1/recommendations")
+    response = client.get("/api/v1/recommendations?include_decided=true")
 
     assert response.status_code == 200
     recommendations = response.json()

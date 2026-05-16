@@ -61,6 +61,7 @@ def test_recommendations_accept_decline_and_not_found() -> None:
     assert list_response.status_code == 200
     recommendations = list_response.json()
     assert len(recommendations) >= 2
+    assert all(recommendation["status"] == "pending" for recommendation in recommendations)
 
     first_id = recommendations[0]["id"]
     accept_response = client.post(f"/api/v1/recommendations/{first_id}/accept")
@@ -74,3 +75,15 @@ def test_recommendations_accept_decline_and_not_found() -> None:
 
     missing_response = client.post("/api/v1/recommendations/missing/accept")
     assert missing_response.status_code == 404
+
+    active_response = client.get("/api/v1/recommendations")
+    assert active_response.status_code == 200
+    assert all(
+        recommendation["status"] == "pending"
+        for recommendation in active_response.json()
+    )
+
+    history_response = client.get("/api/v1/recommendations?include_decided=true")
+    assert history_response.status_code == 200
+    statuses = {recommendation["status"] for recommendation in history_response.json()}
+    assert {"accepted", "declined"}.issubset(statuses)

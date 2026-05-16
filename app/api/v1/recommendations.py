@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import CurrentUserDep
 from app.modules.recommendations.service import recommendation_service
@@ -7,8 +7,14 @@ router = APIRouter()
 
 
 @router.get("")
-async def get_recommendations(current_user: CurrentUserDep) -> list[dict[str, object]]:
-    return recommendation_service.list_recommendations(user_id=current_user.id)
+async def get_recommendations(
+    current_user: CurrentUserDep,
+    include_decided: bool = Query(default=False),
+) -> list[dict[str, object]]:
+    return recommendation_service.list_recommendations(
+        user_id=current_user.id,
+        include_decided=include_decided,
+    )
 
 
 @router.post("/{recommendation_id}/accept")

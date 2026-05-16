@@ -30,12 +30,20 @@ def _now() -> datetime:
 
 
 class RecommendationService:
-    def list_recommendations(self, *, user_id: str) -> list[dict[str, object]]:
+    def list_recommendations(
+        self,
+        *,
+        user_id: str,
+        include_decided: bool = False,
+    ) -> list[dict[str, object]]:
         with SessionLocal() as db:
             self._ensure_seed_recommendations(db, user_id)
+            filters = [RecommendationORM.user_id == user_id]
+            if not include_decided:
+                filters.append(RecommendationORM.status == "pending")
             recommendations = db.scalars(
                 select(RecommendationORM)
-                .where(RecommendationORM.user_id == user_id)
+                .where(*filters)
                 .order_by(RecommendationORM.priority, RecommendationORM.created_at.desc())
             ).all()
             items = [
