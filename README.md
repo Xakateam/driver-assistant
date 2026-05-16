@@ -1,25 +1,26 @@
-# Driver Assistant Backend
+# Сириус: backend финансового ассистента водителя
 
-FastAPI backend for the Moscow Transport hackathon MVP: auth, driver profile,
-vehicles, trips, balance, debts, notifications, recommendations, dashboard, and
-ML adapters.
+FastAPI-сервис для MVP на хакатон: авторизация, профиль водителя, автомобили,
+поездки, баланс, задолженности, уведомления, рекомендации, ML-интеграция,
+дашборд и админ-панель для демо.
 
-## Stack
+## Стек
 
 - Python 3.11+
 - FastAPI
 - PostgreSQL
 - SQLAlchemy
 - Docker / Docker Compose
+- Firebase Cloud Messaging
 - Sentry
 
-## Run
+## Быстрый запуск
 
 ```bash
 docker compose up --build
 ```
 
-Local API:
+Адреса локально:
 
 ```text
 Swagger:  http://127.0.0.1:8000/docs
@@ -29,52 +30,51 @@ Health:   http://127.0.0.1:8000/health
 Postgres: localhost:5433
 ```
 
-Local dev without Docker:
+Запуск без Docker:
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,ml]"
 python -m uvicorn app.main:app --reload
 ```
 
-## Environment
+## Переменные окружения
 
-| Variable | Default | Description |
+| Переменная | По умолчанию | Для чего нужна |
 | --- | --- | --- |
-| `PROJECT_NAME` | `Driver Assistant API` | FastAPI service name. |
-| `VERSION` | `alpha` | API version shown in docs. |
-| `API_V1_PREFIX` | `/api/v1` | API prefix and OpenAPI path prefix. |
-| `DATABASE_URL` | `postgresql+psycopg://driver:driver@localhost:5433/driver_assistant` | SQLAlchemy PostgreSQL URL. |
-| `JWT_SECRET_KEY` | `change-me` | Secret for demo JWT tokens. |
-| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm. |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token lifetime. |
-| `BACKEND_CORS_ORIGINS` | `*` | Comma-separated CORS origins. |
-| `ADMIN_API_KEY` | empty | Optional key for `/api/v1/admin/*`; send as `X-Admin-API-Key`. |
-| `SENTRY_DSN` | empty | Enables Sentry when set. |
-| `SENTRY_ENVIRONMENT` | `local` | Sentry environment name. |
-| `SENTRY_TRACES_SAMPLE_RATE` | `0.0` | Sentry tracing sample rate. |
-| `ML_MODELS_DIR` | `ml_models` | Directory with ML artifacts. |
-| `FIREBASE_PROJECT_ID` | empty | Firebase project id for FCM. |
-| `FIREBASE_SERVICE_ACCOUNT_PATH` | empty | Path to Firebase service account JSON. |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | empty | Raw Firebase service account JSON. |
-| `NOTIFICATION_SCHEDULER_ENABLED` | `true` | Enables in-process notification ticks. |
-| `NOTIFICATION_TICK_INTERVAL_SECONDS` | `120` | Notification tick interval. |
-| `NOTIFICATION_ALLOWED_START_HOUR` | `9` | First hour when scheduled pushes may be sent. |
-| `NOTIFICATION_ALLOWED_END_HOUR` | `21` | Hour when scheduled pushes stop. |
-| `NOTIFICATION_TIMEZONE` | `Europe/Moscow` | Timezone for quiet hours. |
-| `NOTIFICATION_DEDUP_WINDOW_MINUTES` | `180` | Rule dedupe window. |
+| `PROJECT_NAME` | `Driver Assistant API` | Название сервиса в Swagger. |
+| `VERSION` | `alpha` | Версия API. |
+| `API_V1_PREFIX` | `/api/v1` | Префикс API. |
+| `DATABASE_URL` | `postgresql+psycopg://driver:driver@localhost:5433/driver_assistant` | Подключение к PostgreSQL. |
+| `JWT_SECRET_KEY` | `change-me` | Секрет для JWT. В production обязательно заменить. |
+| `JWT_ALGORITHM` | `HS256` | Алгоритм подписи JWT. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Время жизни access token. |
+| `BACKEND_CORS_ORIGINS` | `*` | Разрешенные CORS origins через запятую. |
+| `ADMIN_API_KEY` | пусто | Опциональная защита `/api/v1/admin/*`; передается в `X-Admin-API-Key`. |
+| `SENTRY_DSN` | пусто | Включает Sentry. |
+| `SENTRY_ENVIRONMENT` | `local` | Окружение для Sentry. |
+| `SENTRY_TRACES_SAMPLE_RATE` | `0.0` | Доля trace-событий Sentry. |
+| `ML_MODELS_DIR` | `ml_models` | Папка с ML-артефактами. |
+| `FIREBASE_PROJECT_ID` | пусто | Firebase project id для FCM. |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | пусто | Путь к service account JSON. |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | пусто | Service account JSON строкой. |
+| `NOTIFICATION_SCHEDULER_ENABLED` | `true` | Включает фоновые уведомления. |
+| `NOTIFICATION_TICK_INTERVAL_SECONDS` | `120` | Интервал проверки правил уведомлений. |
+| `NOTIFICATION_ALLOWED_START_HOUR` | `9` | Начало окна фоновых push-уведомлений. |
+| `NOTIFICATION_ALLOWED_END_HOUR` | `21` | Конец окна фоновых push-уведомлений. |
+| `NOTIFICATION_TIMEZONE` | `Europe/Moscow` | Таймзона окна уведомлений. |
+| `NOTIFICATION_DEDUP_WINDOW_MINUTES` | `180` | Окно дедупликации фоновых уведомлений. |
 
-## Useful Commands
+## Проверки
 
 ```bash
 python -m ruff check app tests
 python -m pytest -q
 ```
 
-Demo auth code is currently:
+## Демо
 
-```text
-1234
-```
-
-Most endpoints also fall back to the demo user when no bearer token is provided,
-which keeps Swagger convenient during the hackathon.
+- Код авторизации в MVP: `1234`.
+- Для удобства Swagger часть endpoint'ов работает с demo user без bearer token.
+- Админ-панель: `/admin-panel`.
+- Ручная рассылка push: `POST /api/v1/admin/notifications/send`.
+- Создание поездки/долга из админки сразу отправляет push пользователю.
