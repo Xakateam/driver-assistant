@@ -20,6 +20,13 @@ dev = [
   "httpx>=0.27",
   "ruff>=0.4",
 ]
+ml = [
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "joblib>=1.4",
+  "scikit-learn>=1.4",
+  "catboost>=1.2",
+]
 
 [tool.ruff]
 line-length = 88

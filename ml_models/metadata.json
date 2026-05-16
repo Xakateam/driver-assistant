@@ -1,0 +1,36 @@
+{
+  "model_version": "ml_moscow_transport@4779dba",
+  "source_repository": "https://github.com/322kirpich/ml_moscow_transport/tree/main",
+  "cluster_feature_order": [
+    "trip_frequency",
+    "avg_check",
+    "weekend_share",
+    "is_delayed_payment"
+  ],
+  "spend_feature_order": [
+    "trips_count",
+    "total_spent",
+    "ml_cluster_id"
+  ],
+  "ctr_feature_order": [
+    "current_balance",
+    "debt_amount",
+    "ml_cluster_id",
+    "predicted_spend_next_month",
+    "category_id"
+  ],
+  "cluster_names": {
+    "0": "Работяга",
+    "1": "Дачник",
+    "2": "Бизнес-путешественник",
+    "3": "Экономный",
+    "4": "Премиум"
+  },
+  "recommendation_categories": {
+    "1": "debt_payment",
+    "2": "subscription_offer",
+    "3": "autopay_or_balance",
+    "4": "weekend_discount",
+    "5": "informational"
+  }
+}

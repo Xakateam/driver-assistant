@@ -5,6 +5,10 @@ from sqlalchemy import select
 
 from app.core.database import SessionLocal
 from app.db.models import RecommendationORM
+from app.modules.ml.recommendations import (
+    get_recommendation_category,
+    predict_recommendation_ctr,
+)
 
 
 @dataclass
@@ -34,10 +38,17 @@ class RecommendationService:
                 .where(RecommendationORM.user_id == user_id)
                 .order_by(RecommendationORM.priority, RecommendationORM.created_at.desc())
             ).all()
-            return [
+            items = [
                 self._recommendation_to_dict(recommendation)
                 for recommendation in recommendations
             ]
+            return sorted(
+                items,
+                key=lambda item: (
+                    -float(item["predicted_ctr"]),
+                    int(item["priority"]),
+                ),
+            )
 
     def accept(self, *, user_id: str, recommendation_id: str) -> dict[str, object] | None:
         return self._set_status(
@@ -97,6 +108,7 @@ class RecommendationService:
                     ),
                     priority=1,
                     metadata_json={
+                        "category_id": 4,
                         "estimated_saving_percent": 12,
                         "suggested_time": "10:20",
                     },
@@ -111,7 +123,7 @@ class RecommendationService:
                         "до следующей регулярной поездки."
                     ),
                     priority=2,
-                    metadata_json={"amount": 1000, "currency": "RUB"},
+                    metadata_json={"category_id": 3, "amount": 1000, "currency": "RUB"},
                 ),
             ]
         )
@@ -119,19 +131,35 @@ class RecommendationService:
 
     @staticmethod
     def _recommendation_to_dict(recommendation: RecommendationORM) -> dict[str, object]:
+        metadata = recommendation.metadata_json or {}
+        category_id = int(
+            metadata.get("category_id")
+            or get_recommendation_category(recommendation.type)
+        )
+        ctr_prediction = predict_recommendation_ctr(
+            recommendation.user_id,
+            category_id,
+        )
+        enriched_metadata = {
+            **metadata,
+            "category_id": category_id,
+            "ctr_source": ctr_prediction["source"],
+        }
         return {
             "id": recommendation.id,
             "user_id": recommendation.user_id,
             "type": recommendation.type,
+            "category_id": category_id,
             "title": recommendation.title,
             "body": recommendation.body,
             "status": recommendation.status,
             "priority": recommendation.priority,
+            "predicted_ctr": ctr_prediction["predicted_ctr"],
             "created_at": recommendation.created_at.isoformat(),
             "decided_at": recommendation.decided_at.isoformat()
             if recommendation.decided_at
             else None,
-            "metadata": recommendation.metadata_json,
+            "metadata": enriched_metadata,
         }
 
 

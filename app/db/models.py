@@ -22,6 +22,15 @@ class UserORM(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     phone: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     segment: Mapped[str] = mapped_column(String(64), default="commuter")
+    ml_cluster_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ml_cluster_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    predicted_spend_next_month: Mapped[float | None] = mapped_column(Float, nullable=True)
+    favorite_route_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ml_model_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ml_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     vehicles: Mapped[list["VehicleORM"]] = relationship(

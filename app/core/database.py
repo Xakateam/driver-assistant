@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
@@ -30,8 +30,31 @@ def get_db_session() -> Iterator[Session]:
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_schema_compatibility()
     with SessionLocal() as db:
         seed_demo_data(db)
+
+
+def ensure_schema_compatibility() -> None:
+    if engine.dialect.name != "postgresql":
+        return
+
+    user_columns = {
+        "ml_cluster_id": "INTEGER",
+        "ml_cluster_name": "VARCHAR(128)",
+        "predicted_spend_next_month": "DOUBLE PRECISION",
+        "favorite_route_name": "VARCHAR(255)",
+        "ml_model_version": "VARCHAR(64)",
+        "ml_updated_at": "TIMESTAMP WITH TIME ZONE",
+    }
+    with engine.begin() as connection:
+        for column_name, column_type in user_columns.items():
+            connection.execute(
+                text(
+                    f"ALTER TABLE users "
+                    f"ADD COLUMN IF NOT EXISTS {column_name} {column_type}"
+                )
+            )
 
 
 def seed_demo_data(db: Session) -> UserORM:
@@ -176,7 +199,11 @@ def _seed_recommendations(db: Session, user_id: str) -> None:
                     "пополнения баланса в дороге."
                 ),
                 priority=1,
-                metadata_json={"estimated_saving_percent": 12, "suggested_time": "10:20"},
+                metadata_json={
+                    "category_id": 4,
+                    "estimated_saving_percent": 12,
+                    "suggested_time": "10:20",
+                },
             ),
             RecommendationORM(
                 id="demo-topup",
@@ -188,7 +215,7 @@ def _seed_recommendations(db: Session, user_id: str) -> None:
                     "до следующей регулярной поездки."
                 ),
                 priority=2,
-                metadata_json={"amount": 1000, "currency": "RUB"},
+                metadata_json={"category_id": 3, "amount": 1000, "currency": "RUB"},
             ),
         ]
     )

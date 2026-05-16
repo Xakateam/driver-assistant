@@ -14,13 +14,15 @@ has Docker and ML adapter boundaries prepared for the next implementation step.
 - Python 3.11+
 - FastAPI
 - PostgreSQL
+- SQLAlchemy 2
 - Pydantic
 - Uvicorn
-
 - Docker / Docker Compose
+- Sentry
+- Optional ML runtime: sklearn/joblib, CatBoost, pandas, numpy
 
-Planned next pieces: SQLAlchemy 2, Alembic, real JWT signing, and real FCM
-credentials.
+Planned next pieces: Alembic migrations, real JWT signing, randomized OTP, and
+real FCM credentials.
 
 ## Project Structure
 
@@ -232,14 +234,70 @@ Celery Beat, Redis Queue, or a separate worker without changing the public API.
 
 ## ML Integration Contract
 
-ML models are expected as external artifacts:
+ML artifacts from
+[`322kirpich/ml_moscow_transport`](https://github.com/322kirpich/ml_moscow_transport/tree/main)
+are stored under `ml_models/` and loaded lazily. If optional ML dependencies are
+not installed, the API keeps working with deterministic fallback heuristics.
 
 ```text
 ml_models/
-  clustering.joblib
-  recommender.joblib
+  kmeans_model.joblib
+  scaler.joblib
+  spend_predictor.cbm
+  ctr_model.cbm
   metadata.json
 ```
 
-`metadata.json` should contain the model version, feature order, and segment
-names. Prefer sklearn pipelines that include preprocessing.
+Install local ML dependencies only when real artifact execution is needed:
+
+```bash
+python -m pip install -e ".[ml]"
+```
+
+The release Docker image installs `.[ml]` and includes the artifacts.
+
+Segmentation:
+
+```text
+input:  trip_frequency, avg_check, weekend_share, is_delayed_payment
+output: ml_cluster_id, ml_cluster_name
+```
+
+Spend prediction:
+
+```text
+input:  trips_count, total_spent, ml_cluster_id
+output: predicted_spend_next_month
+```
+
+Recommendation CTR:
+
+```text
+input:  current_balance, debt_amount, ml_cluster_id,
+        predicted_spend_next_month, category_id
+output: predicted_ctr
+```
+
+Backend storage additions on `users`:
+
+```text
+ml_cluster_id
+ml_cluster_name
+predicted_spend_next_month
+favorite_route_name
+ml_model_version
+ml_updated_at
+```
+
+Recalculate current user:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/ml/recalculate-me \
+  -H "Authorization: Bearer <access_token>"
+```
+
+Check artifact/dependency status:
+
+```text
+GET /api/v1/admin/ml/status
+```
