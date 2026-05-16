@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Driver Assistant Admin</title>
+  <title>Админ-панель Сириус</title>
   <style>
     :root {
       color-scheme: light;
@@ -58,6 +58,7 @@
     label { display: grid; gap: 5px; font-size: 12px; color: #536073; }
     .stack { display: grid; gap: 10px; }
     .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .wide { grid-column: 1 / -1; }
     .users { display: grid; gap: 8px; margin-top: 12px; }
     .user-row {
       display: grid;
@@ -95,90 +96,116 @@
 </head>
 <body>
   <header>
-    <h1>Driver Assistant Admin</h1>
+    <h1>Сириус · админ-панель</h1>
     <label style="max-width: 360px; color: white;">
       X-Admin-API-Key
-      <input id="adminKey" placeholder="optional" />
+      <input id="adminKey" placeholder="если задан на сервере" />
     </label>
   </header>
   <main>
     <section>
-      <h2>Users</h2>
+      <h2>Пользователи</h2>
       <form id="createUserForm" class="stack">
-        <label>Phone <input name="phone" value="+79990000000" /></label>
-        <label>Plate <input name="plate_number" value="А123ВС777" /></label>
-        <label>Vehicle <input name="vehicle_name" value="Kia Rio" /></label>
-        <button>Create / open user</button>
+        <label>Телефон <input name="phone" value="+79990000000" /></label>
+        <label>Госномер <input name="plate_number" value="А123ВС777" /></label>
+        <label>Автомобиль <input name="vehicle_name" value="Kia Rio" /></label>
+        <button>Создать / открыть</button>
       </form>
-      <button id="refreshUsers" class="secondary" style="margin-top: 10px;">Refresh users</button>
+      <button id="refreshUsers" class="secondary" style="margin-top: 10px;">Обновить список</button>
       <div id="users" class="users"></div>
     </section>
     <div class="panel">
       <section>
-        <h2 id="selectedTitle">Select user</h2>
+        <h2 id="selectedTitle">Выберите пользователя</h2>
         <div class="metric-grid">
-          <div class="metric"><span class="muted">Balance</span><strong id="balance">-</strong></div>
-          <div class="metric"><span class="muted">Debts</span><strong id="debts">-</strong></div>
-          <div class="metric"><span class="muted">ML segment</span><strong id="segment">-</strong></div>
-          <div class="metric"><span class="muted">Forecast</span><strong id="forecast">-</strong></div>
+          <div class="metric"><span class="muted">Баланс</span><strong id="balance">-</strong></div>
+          <div class="metric"><span class="muted">Долги</span><strong id="debts">-</strong></div>
+          <div class="metric"><span class="muted">ML-сегмент</span><strong id="segment">-</strong></div>
+          <div class="metric"><span class="muted">Прогноз трат</span><strong id="forecast">-</strong></div>
         </div>
       </section>
 
       <section class="stack">
-        <h2>Demo actions</h2>
+        <h2>Демо-действия</h2>
         <div class="grid">
           <form data-action="topup" class="stack">
-            <h3>Top up</h3>
-            <label>Amount <input name="amount" type="number" value="1000" /></label>
-            <button>Top up</button>
+            <h3>Пополнить баланс</h3>
+            <label>Сумма, ₽ <input name="amount" type="number" value="1000" /></label>
+            <button>Пополнить</button>
           </form>
           <form data-action="balance" class="stack">
-            <h3>Set balance</h3>
-            <label>Amount <input name="amount" type="number" value="120" /></label>
-            <button>Set balance</button>
+            <h3>Выставить баланс</h3>
+            <label>Итоговая сумма, ₽ <input name="amount" type="number" value="120" /></label>
+            <button>Выставить</button>
           </form>
           <form data-action="trip" class="stack">
-            <h3>Create trip</h3>
-            <label>Status
-              <select name="status"><option>paid</option><option>debt</option></select>
+            <h3>Создать поездку</h3>
+            <label>Статус оплаты
+              <select name="status">
+                <option value="paid">Оплачено</option>
+                <option value="debt">Долг</option>
+              </select>
             </label>
-            <label>Amount <input name="amount" type="number" value="220" /></label>
-            <button>Create trip</button>
+            <button>Создать поездку</button>
+          </form>
+          <form id="tripDetailsForm" class="stack wide">
+            <h3>Параметры участка дороги для новой поездки</h3>
+            <div class="grid">
+              <label>Трасса / дорога
+                <select name="road_name">
+                  <option value="M-12">M-12</option>
+                  <option value="ЦКАД">ЦКАД</option>
+                  <option value="М-11">М-11</option>
+                  <option value="Северный обход Одинцово">Северный обход Одинцово</option>
+                </select>
+              </label>
+              <label>Пункт въезда <input name="entry_point" value="Ногинск" /></label>
+              <label>Пункт выезда <input name="exit_point" value="Орехово-Зуево" /></label>
+              <label>Дистанция, км <input name="distance_km" type="number" value="38" /></label>
+              <label>Стоимость, ₽ <input name="amount" type="number" value="220" /></label>
+              <label>Когда
+                <select name="started_at_mode">
+                  <option value="now">Сейчас</option>
+                  <option value="morning">Сегодня утром</option>
+                  <option value="yesterday">Вчера</option>
+                </select>
+              </label>
+            </div>
           </form>
         </div>
         <div class="two">
           <form id="scenarioForm" class="stack">
-            <h3>Scenario</h3>
-            <label>Scenario
+            <h3>Сценарий</h3>
+            <label>Сценарий
               <select name="scenario">
-                <option value="low_balance">low_balance</option>
-                <option value="debt_user">debt_user</option>
-                <option value="heavy_commuter">heavy_commuter</option>
-                <option value="weekend_driver">weekend_driver</option>
+                <option value="low_balance">Низкий баланс</option>
+                <option value="debt_user">Пользователь с долгами</option>
+                <option value="heavy_commuter">Частый водитель</option>
+                <option value="weekend_driver">Дачник / выходные</option>
               </select>
             </label>
-            <button>Apply scenario</button>
+            <button>Применить сценарий</button>
           </form>
           <form id="mlForm" class="stack">
             <h3>ML</h3>
-            <button>Recalculate user ML</button>
+            <button>Пересчитать ML пользователя</button>
           </form>
         </div>
       </section>
 
       <section>
-        <h2>Custom notification</h2>
+        <h2>Кастомное уведомление</h2>
         <form id="notificationForm" class="stack">
-          <label>Type <input name="type" value="admin_message" /></label>
-          <label>Title <input name="title" value="Проверка уведомлений" /></label>
-          <label>Body <textarea name="body">Если видишь это сообщение, пуши работают.</textarea></label>
+          <label>Тип <input name="type" value="admin_message" /></label>
+          <label>Заголовок <input name="title" value="Проверка уведомлений" /></label>
+          <label>Текст <textarea name="body">Если видишь это сообщение, пуши работают.</textarea></label>
           <label>Deep link <input name="deep_link" value="driverassistant://notifications" /></label>
-          <button>Send notification</button>
+          <button>Отправить уведомление</button>
         </form>
       </section>
 
       <section>
-        <h2>Selected user snapshot</h2>
+        <h2>Снимок выбранного пользователя</h2>
         <pre id="snapshot">{}</pre>
       </section>
     </div>
@@ -212,7 +239,7 @@
       payload.items.forEach(user => {
         const row = document.createElement("div");
         row.className = `user-row ${user.id === selectedUserId ? "active" : ""}`;
-        row.innerHTML = `<strong>${user.phone}</strong><span class="muted">${user.id}</span><span>${user.balance.amount} ₽ · debts ${user.debts_summary.amount} ₽</span>`;
+        row.innerHTML = `<strong>${user.phone}</strong><span class="muted">${user.id}</span><span>${user.balance.amount} ₽ · долги ${user.debts_summary.amount} ₽</span>`;
         row.onclick = () => selectUser(user.id);
         root.appendChild(row);
       });
@@ -243,7 +270,7 @@
 
     document.querySelector('[data-action="topup"]').onsubmit = async (event) => {
       event.preventDefault();
-      if (!selectedUserId) return alert("Select user");
+      if (!selectedUserId) return alert("Выберите пользователя");
       const amount = Number(new FormData(event.target).get("amount"));
       await api(`/users/${selectedUserId}/top-up`, {method: "POST", body: JSON.stringify({amount, payment_method: "admin_panel"})});
       await selectUser(selectedUserId);
@@ -251,7 +278,7 @@
 
     document.querySelector('[data-action="balance"]').onsubmit = async (event) => {
       event.preventDefault();
-      if (!selectedUserId) return alert("Select user");
+      if (!selectedUserId) return alert("Выберите пользователя");
       const amount = Number(new FormData(event.target).get("amount"));
       await api(`/users/${selectedUserId}/balance`, {method: "POST", body: JSON.stringify({amount})});
       await selectUser(selectedUserId);
@@ -259,9 +286,18 @@
 
     document.querySelector('[data-action="trip"]').onsubmit = async (event) => {
       event.preventDefault();
-      if (!selectedUserId) return alert("Select user");
+      if (!selectedUserId) return alert("Выберите пользователя");
       const form = new FormData(event.target);
-      const body = {status: form.get("status"), amount: Number(form.get("amount"))};
+      const details = Object.fromEntries(new FormData(document.getElementById("tripDetailsForm")).entries());
+      const body = {
+        status: form.get("status"),
+        road_name: details.road_name,
+        entry_point: details.entry_point,
+        exit_point: details.exit_point,
+        distance_km: Number(details.distance_km),
+        amount: Number(details.amount),
+        started_at: startedAt(details.started_at_mode),
+      };
       const path = body.status === "debt" ? "debts" : "trips";
       await api(`/users/${selectedUserId}/${path}`, {method: "POST", body: JSON.stringify(body)});
       await selectUser(selectedUserId);
@@ -269,7 +305,7 @@
 
     document.getElementById("scenarioForm").onsubmit = async (event) => {
       event.preventDefault();
-      if (!selectedUserId) return alert("Select user");
+      if (!selectedUserId) return alert("Выберите пользователя");
       const user = (await api(`/users/${selectedUserId}`)).user;
       const scenario = new FormData(event.target).get("scenario");
       await api(`/demo/scenarios/${scenario}`, {method: "POST", body: JSON.stringify({phone: user.phone, send_push: true})});
@@ -278,14 +314,14 @@
 
     document.getElementById("mlForm").onsubmit = async (event) => {
       event.preventDefault();
-      if (!selectedUserId) return alert("Select user");
+      if (!selectedUserId) return alert("Выберите пользователя");
       await api(`/users/${selectedUserId}/ml/recalculate`, {method: "POST"});
       await selectUser(selectedUserId);
     };
 
     document.getElementById("notificationForm").onsubmit = async (event) => {
       event.preventDefault();
-      if (!selectedUserId) return alert("Select user");
+      if (!selectedUserId) return alert("Выберите пользователя");
       const form = Object.fromEntries(new FormData(event.target).entries());
       await api("/notifications/send", {
         method: "POST",
@@ -293,6 +329,13 @@
       });
       await selectUser(selectedUserId);
     };
+
+    function startedAt(mode) {
+      const date = new Date();
+      if (mode === "morning") date.setHours(8, 40, 0, 0);
+      if (mode === "yesterday") date.setDate(date.getDate() - 1);
+      return date.toISOString();
+    }
 
     refreshUsers().catch(error => alert(error.message));
   </script>

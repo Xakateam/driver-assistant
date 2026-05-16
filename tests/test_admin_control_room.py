@@ -9,7 +9,7 @@ client = TestClient(app)
 def test_admin_control_room_user_actions_and_panel() -> None:
     panel = client.get("/admin-panel")
     assert panel.status_code == 200
-    assert "Driver Assistant Admin" in panel.text
+    assert "Сириус · админ-панель" in panel.text
 
     create_user = client.post(
         "/api/v1/admin/users",
@@ -31,10 +31,20 @@ def test_admin_control_room_user_actions_and_panel() -> None:
 
     debt = client.post(
         f"/api/v1/admin/users/{user_id}/debts",
-        json={"amount": 222, "entry_point": "А-107", "exit_point": "М-7"},
+        json={
+            "road_name": "ЦКАД",
+            "amount": 222,
+            "entry_point": "А-107",
+            "exit_point": "М-7",
+            "distance_km": 41,
+        },
     )
     assert debt.status_code == 200
     assert debt.json()["status"] == "debt"
+    assert debt.json()["road_name"] == "ЦКАД"
+    assert debt.json()["entry_point"] == "А-107"
+    assert debt.json()["exit_point"] == "М-7"
+    assert debt.json()["distance_km"] == 41
 
     recalculate = client.post(f"/api/v1/admin/users/{user_id}/ml/recalculate")
     assert recalculate.status_code == 200
