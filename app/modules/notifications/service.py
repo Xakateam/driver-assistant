@@ -1,11 +1,13 @@
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.db.models import DeviceTokenORM, NotificationORM
+from app.modules.notifications.providers.factory import get_push_provider
 
 
 @dataclass
@@ -169,6 +171,110 @@ class NotificationService:
             db.refresh(notification)
             return self._notification_to_dict(notification)
 
+    def dispatch_notification(
+        self,
+        *,
+        user_id: str,
+        type: str,
+        title: str,
+        body: str,
+        deep_link: str | None = None,
+        metadata: dict[str, object] | None = None,
+        ignore_quiet_hours: bool = False,
+        dedupe_window_minutes: int | None = None,
+    ) -> dict[str, object]:
+        if dedupe_window_minutes is not None and self.has_recent_notification(
+            user_id=user_id,
+            type=type,
+            window_minutes=dedupe_window_minutes,
+        ):
+            return {
+                "status": "deduplicated",
+                "notification": None,
+                "deliveries": [],
+            }
+
+        notification = self.create_notification(
+            user_id=user_id,
+            type=type,
+            title=title,
+            body=body,
+            deep_link=deep_link,
+            metadata=metadata,
+        )
+        deliveries = self.deliver_notification(
+            user_id=user_id,
+            notification=notification,
+            ignore_quiet_hours=ignore_quiet_hours,
+        )
+        return {
+            "status": "created",
+            "notification": notification,
+            "deliveries": deliveries,
+        }
+
+    def deliver_notification(
+        self,
+        *,
+        user_id: str,
+        notification: dict[str, object],
+        ignore_quiet_hours: bool = False,
+    ) -> list[dict[str, object]]:
+        if not ignore_quiet_hours and not is_notification_window_open():
+            return [
+                {
+                    "status": "skipped",
+                    "reason": "quiet_hours",
+                    "provider": "none",
+                }
+            ]
+
+        with SessionLocal() as db:
+            tokens = db.scalars(
+                select(DeviceTokenORM).where(DeviceTokenORM.user_id == user_id)
+            ).all()
+
+        if not tokens:
+            return [
+                {
+                    "status": "skipped",
+                    "reason": "no_device_tokens",
+                    "provider": "none",
+                }
+            ]
+
+        provider = get_push_provider()
+        data = _notification_data(notification)
+        return [
+            provider.send(
+                token=device.fcm_token,
+                title=str(notification["title"]),
+                body=str(notification["body"]),
+                data=data,
+            )
+            for device in tokens
+        ]
+
+    def has_recent_notification(
+        self,
+        *,
+        user_id: str,
+        type: str,
+        window_minutes: int,
+    ) -> bool:
+        cutoff = _now() - timedelta(minutes=window_minutes)
+        with SessionLocal() as db:
+            notification_id = db.scalar(
+                select(NotificationORM.id)
+                .where(
+                    NotificationORM.user_id == user_id,
+                    NotificationORM.type == type,
+                    NotificationORM.created_at >= cutoff,
+                )
+                .limit(1)
+            )
+            return notification_id is not None
+
     def get_notification(
         self,
         *,
@@ -229,6 +335,10 @@ class NotificationService:
         rule.enabled = enabled
         return asdict(rule)
 
+    def is_rule_enabled(self, rule_id: str) -> bool:
+        rule = self._rules.get(rule_id)
+        return bool(rule and rule.enabled)
+
     def reset(self) -> None:
         with SessionLocal() as db:
             db.query(DeviceTokenORM).delete()
@@ -288,3 +398,33 @@ class NotificationService:
 
 
 notification_service = NotificationService()
+
+
+def is_notification_window_open(now: datetime | None = None) -> bool:
+    from zoneinfo import ZoneInfo
+
+    current = now or datetime.now(ZoneInfo(settings.NOTIFICATION_TIMEZONE))
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=ZoneInfo(settings.NOTIFICATION_TIMEZONE))
+    local_hour = current.astimezone(ZoneInfo(settings.NOTIFICATION_TIMEZONE)).hour
+    start = settings.NOTIFICATION_ALLOWED_START_HOUR
+    end = settings.NOTIFICATION_ALLOWED_END_HOUR
+    if start < end:
+        return start <= local_hour < end
+    return local_hour >= start or local_hour < end
+
+
+def _notification_data(notification: dict[str, object]) -> dict[str, str]:
+    metadata = notification.get("metadata") or {}
+    data = {
+        "notification_id": str(notification["id"]),
+        "type": str(notification["type"]),
+    }
+    deep_link = notification.get("deep_link")
+    if deep_link:
+        data["deep_link"] = str(deep_link)
+    if isinstance(metadata, dict):
+        for key, value in metadata.items():
+            if isinstance(value, (str, int, float, bool)):
+                data[f"metadata_{key}"] = str(value)
+    return data

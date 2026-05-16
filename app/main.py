@@ -8,6 +8,10 @@ from app.core.config import Settings, settings
 from app.core.database import init_db
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
+from app.modules.notifications.scheduler import (
+    start_notification_scheduler,
+    stop_notification_scheduler,
+)
 
 
 def init_sentry(app_settings: Settings = settings) -> None:
@@ -30,7 +34,11 @@ def init_sentry(app_settings: Settings = settings) -> None:
 async def lifespan(app: FastAPI):
     configure_logging()
     init_db()
-    yield
+    scheduler_task = start_notification_scheduler()
+    try:
+        yield
+    finally:
+        await stop_notification_scheduler(scheduler_task)
 
 
 def create_app() -> FastAPI:

@@ -49,6 +49,26 @@ def test_notifications_device_read_action_and_rules() -> None:
     assert rule_response.status_code == 200
     assert rule_response.json()["enabled"] is False
 
+    manual_response = client.post(
+        "/api/v1/admin/notifications/send",
+        json={
+            "phone": "+79990000000",
+            "type": "admin_message",
+            "title": "Тестовое уведомление",
+            "body": "Проверяем ручную отправку.",
+            "deep_link": "driverassistant://notifications",
+            "ignore_quiet_hours": True,
+        },
+    )
+    assert manual_response.status_code == 200
+    manual_payload = manual_response.json()
+    assert manual_payload["created"] == 1
+    assert manual_payload["results"][0]["deliveries"][0]["provider"] in {
+        "mock",
+        "fcm",
+        "none",
+    }
+
 
 def test_notification_not_found_returns_404() -> None:
     response = client.get("/api/v1/notifications/missing")

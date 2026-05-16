@@ -5,7 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 JsonScalar: TypeAlias = str | int | float | bool | None
-Metadata: TypeAlias = dict[str, JsonScalar]
+JsonValue: TypeAlias = JsonScalar | list[JsonScalar] | dict[str, JsonScalar]
+Metadata: TypeAlias = dict[str, JsonValue]
 
 
 class ApiModel(BaseModel):

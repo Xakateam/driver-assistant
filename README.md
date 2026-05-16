@@ -51,6 +51,15 @@ python -m uvicorn app.main:app --reload
 | `SENTRY_ENVIRONMENT` | `local` | Sentry environment name. |
 | `SENTRY_TRACES_SAMPLE_RATE` | `0.0` | Sentry tracing sample rate. |
 | `ML_MODELS_DIR` | `ml_models` | Directory with ML artifacts. |
+| `FIREBASE_PROJECT_ID` | empty | Firebase project id for FCM. |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | empty | Path to Firebase service account JSON. |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | empty | Raw Firebase service account JSON. |
+| `NOTIFICATION_SCHEDULER_ENABLED` | `true` | Enables in-process notification ticks. |
+| `NOTIFICATION_TICK_INTERVAL_SECONDS` | `1800` | Notification tick interval. |
+| `NOTIFICATION_ALLOWED_START_HOUR` | `9` | First hour when scheduled pushes may be sent. |
+| `NOTIFICATION_ALLOWED_END_HOUR` | `21` | Hour when scheduled pushes stop. |
+| `NOTIFICATION_TIMEZONE` | `Europe/Moscow` | Timezone for quiet hours. |
+| `NOTIFICATION_DEDUP_WINDOW_MINUTES` | `180` | Rule dedupe window. |
 
 ## Useful Commands
 

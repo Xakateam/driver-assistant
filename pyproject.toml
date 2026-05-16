@@ -12,6 +12,8 @@ dependencies = [
   "psycopg[binary]>=3.1",
   "alembic>=1.13",
   "sentry-sdk[fastapi]>=2.0",
+  "google-auth>=2.30",
+  "requests>=2.32",
 ]
 
 [project.optional-dependencies]
