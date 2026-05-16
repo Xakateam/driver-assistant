@@ -127,6 +127,40 @@ def list_debts(user_id: str) -> list[dict[str, object]]:
         ]
 
 
+def pay_debt(user_id: str, debt_id: str) -> dict[str, object] | None:
+    with SessionLocal() as db:
+        trip = db.get(TripORM, debt_id)
+        if trip is None or trip.user_id != user_id or trip.status != "debt":
+            return None
+
+        transaction = TransactionORM(
+            user_id=user_id,
+            type="debt",
+            amount=-float(trip.amount),
+            description=f"Debt payment for {trip.entry_point} -> {trip.exit_point}",
+        )
+        trip.status = "paid"
+        db.add(transaction)
+        db.commit()
+        db.refresh(transaction)
+
+    notification_service.create_notification(
+        user_id=user_id,
+        type="debt_paid",
+        title="Задолженность погашена",
+        body=f"Оплата поездки {debt_id[:8]} на {transaction.amount * -1:.0f} ₽ прошла.",
+        deep_link="driverassistant://debts",
+        metadata={"debt_id": debt_id, "amount": abs(transaction.amount)},
+    )
+    return {
+        "status": "paid",
+        "debt_id": debt_id,
+        "balance": get_balance(user_id),
+        "debts_summary": get_debt_summary(user_id),
+        "transaction": _serialize_transaction(transaction),
+    }
+
+
 def get_debt_summary(user_id: str) -> dict[str, object]:
     debts = list_debts(user_id)
     total_amount = round(sum(float(debt["amount"]) for debt in debts), 2)

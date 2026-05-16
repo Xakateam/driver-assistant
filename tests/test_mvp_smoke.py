@@ -59,3 +59,15 @@ def test_mvp_demo_flow() -> None:
 
     debts = client.get("/api/v1/debts/summary", headers=headers)
     assert debts.status_code == 200
+
+    debts_list = client.get("/api/v1/debts", headers=headers)
+    assert debts_list.status_code == 200
+    if debts_list.json():
+        debt_id = debts_list.json()[0]["id"]
+        pay_debt = client.post(f"/api/v1/debts/{debt_id}/pay", headers=headers)
+        assert pay_debt.status_code == 200
+        assert pay_debt.json()["status"] == "paid"
+        assert pay_debt.json()["debt_id"] == debt_id
+
+        missing_debt = client.post(f"/api/v1/debts/{debt_id}/pay", headers=headers)
+        assert missing_debt.status_code == 404

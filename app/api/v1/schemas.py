@@ -75,6 +75,14 @@ class DebtSummaryOut(ApiModel):
     has_overdues: bool
 
 
+class DebtPaymentOut(ApiModel):
+    status: Literal["paid"]
+    debt_id: str
+    balance: BalanceOut
+    debts_summary: DebtSummaryOut
+    transaction: TransactionOut
+
+
 class DeviceRegisterOut(ApiModel):
     id: str
     status: Literal["registered"]
